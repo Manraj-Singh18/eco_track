@@ -242,7 +242,7 @@ if (selectedComplaint == "Other")
   AppState.landmark = landmarkController.text;
 
   AppState.complaintType =
-      selectedComplaint == "Other"
+      selectedComplaint == "Nonother"
           ? otherIssueController.text
           : selectedComplaint;
 
