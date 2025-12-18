@@ -255,7 +255,7 @@ if (selectedComplaint == "Other")
   });
 },
 
-              child: const Text("Submit"),
+              child: const Text("Summit"),
             ),
           ),
         ),
