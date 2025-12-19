@@ -24,14 +24,20 @@ migrate_working_dir/
 #.vscode/
 
 # Flutter/Dart/Pub related
+**/ios/Runner/GoogleService-Info.plist
+**/android/app/google-service.json
 **/doc/api/
 **/ios/Flutter/.last_build_id
 .dart_tool/
+.vscode/
+.flutter-plugins
 .flutter-plugins-dependencies
+.packages
 .pub-cache/
+.metadata
 .pub/
 /build/
-/coverage/
+pubspec.lock
 
 # Symbolication related
 app.*.symbols
@@ -43,3 +49,26 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Flutter example folder platforms
+/macos/
+/windows/
+/web/
+/linux/
+/build/
+/test/
+
+# Android Gradle related
+/android/.gradle/
+/android/app/.cxx/
+/android/local.properties
+
+# iOS CocoaPods related
+/ios/Pods/
+/ios/.symlinks/
+/ios/.flutter-plugins/
+/ios/.flutter-plugins-dependencies/
+/ios/Podfile.lock
+
+# Firebase related
+lib/firebase_options.dart
