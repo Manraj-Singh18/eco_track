@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "537385794315",
+    "firebase_url": "https://hackathon-dashboard-98188-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "hackathon-dashboard-98188",
+    "storage_bucket": "hackathon-dashboard-98188.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:537385794315:android:b80cfbcddb05663ff8800e",
+        "android_client_info": {
+          "package_name": "com.example.eco_track"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD2orig7UrOzmZT1NLwZt2oKe2YYKOj9v0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

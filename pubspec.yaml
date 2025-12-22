@@ -21,6 +21,11 @@ dependencies:
   # Google Places autocomplete (SAFE & MAINTAINED)
   google_places_flutter: ^2.0.6
 
+  #firebase authentication
+  firebase_core: ^3.6.0
+  firebase_auth: ^5.3.0
+  cloud_firestore: ^5.4.0
+
   # iOS-style icons
   cupertino_icons: ^1.0.8
 
