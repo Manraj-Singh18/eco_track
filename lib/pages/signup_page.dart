@@ -18,7 +18,6 @@ class _SignupPageState extends State<SignupPage> {
   bool isLoading = false;
 
   Future<void> signup() async {
-    // Basic validation
     if (emailController.text.isEmpty ||
         passwordController.text.isEmpty ||
         confirmPasswordController.text.isEmpty) {
@@ -39,7 +38,6 @@ class _SignupPageState extends State<SignupPage> {
     setState(() => isLoading = true);
 
     try {
-      // Create user in Firebase Auth
       final userCredential =
           await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: emailController.text.trim(),
@@ -48,7 +46,6 @@ class _SignupPageState extends State<SignupPage> {
 
       final user = userCredential.user;
 
-      // Save user profile in Firestore
       if (user != null) {
         await FirebaseFirestore.instance
             .collection('users')
@@ -60,19 +57,24 @@ class _SignupPageState extends State<SignupPage> {
         });
       }
 
-      // Go back to login (AuthGate will redirect automatically)
-      Navigator.pop(context);
+      if (!mounted) return;
+      Navigator.pop(context); // AuthGate will redirect
+
     } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message ?? "Signup failed")),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Something went wrong")),
       );
+    } finally {
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
     }
-
-    setState(() => isLoading = false);
   }
 
   @override
@@ -94,25 +96,20 @@ class _SignupPageState extends State<SignupPage> {
             TextField(
               controller: emailController,
               keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(
-                labelText: "Email",
-              ),
+              decoration: const InputDecoration(labelText: "Email"),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: passwordController,
               obscureText: true,
-              decoration: const InputDecoration(
-                labelText: "Password",
-              ),
+              decoration: const InputDecoration(labelText: "Password"),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: confirmPasswordController,
               obscureText: true,
-              decoration: const InputDecoration(
-                labelText: "Confirm Password",
-              ),
+              decoration:
+                  const InputDecoration(labelText: "Confirm Password"),
             ),
             const SizedBox(height: 24),
             SizedBox(
@@ -121,9 +118,7 @@ class _SignupPageState extends State<SignupPage> {
               child: ElevatedButton(
                 onPressed: isLoading ? null : signup,
                 child: isLoading
-                    ? const CircularProgressIndicator(
-                        color: Colors.white,
-                      )
+                    ? const CircularProgressIndicator(color: Colors.white)
                     : const Text("Create Account"),
               ),
             ),

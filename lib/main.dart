@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'pages/complaint_list_page.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+
+import 'firebase_options.dart';
+import 'pages/complaint_list_page.dart';
 import 'pages/login_page.dart';
 
 void main() async {
@@ -14,7 +15,6 @@ void main() async {
 
   runApp(const MyApp());
 }
-
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -43,6 +43,5 @@ class MyApp extends StatelessWidget {
         },
       ),
     );
-  
-}
+  }
 }

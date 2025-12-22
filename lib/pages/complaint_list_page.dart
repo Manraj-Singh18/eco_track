@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'add_complaint_page.dart';
-import 'login_page.dart';
 
 class ComplaintListPage extends StatelessWidget {
   const ComplaintListPage({super.key});
@@ -10,27 +9,34 @@ class ComplaintListPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser!;
-    
+
     return Scaffold(
       appBar: AppBar(
-  title: const Text("My Complaints"),
-  actions: [
-    IconButton(
-      icon: const Icon(Icons.logout),
-      onPressed: () async {
-        await FirebaseAuth.instance.signOut();
+        title: const Text("My Complaints"),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+              // ❌ NO NAVIGATION
+              // AuthGate will redirect automatically
+            },
+          ),
+        ],
+      ),
 
-        if (!context.mounted) return;
-
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const LoginPage()),
-          (route) => false,
-        );
-      },
-    ),
-  ],
-),
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: Colors.green,
+        child: const Icon(Icons.add),
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const AddComplaintPage(),
+            ),
+          );
+        },
+      ),
 
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
@@ -52,12 +58,13 @@ class ComplaintListPage extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             itemCount: complaints.length,
             itemBuilder: (context, index) {
-              final data = complaints[index].data() as Map<String, dynamic>;
+              final data =
+                  complaints[index].data() as Map<String, dynamic>;
 
               return ComplaintCard(
-                issue: data['issue'],
-                address: data['address'],
-                status: data['status'],
+                issue: data['issue'] ?? 'Unknown',
+                address: data['address'] ?? 'No address',
+                status: data['status'] ?? 'pending',
               );
             },
           );
