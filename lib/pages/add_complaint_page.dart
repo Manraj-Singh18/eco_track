@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
@@ -39,8 +40,6 @@ class _AddComplaintPageState extends State<AddComplaintPage> {
     "Other",
   ];
 
-  // ---------------- LIFECYCLE ----------------
-
   @override
   void initState() {
     super.initState();
@@ -57,43 +56,32 @@ class _AddComplaintPageState extends State<AddComplaintPage> {
     super.dispose();
   }
 
-  // ---------------- LOCATION ----------------
+  /* ---------------- LOCATION ---------------- */
 
   Future<void> _initLocation() async {
     await Geolocator.requestPermission();
-
     final position = await Geolocator.getCurrentPosition(
       desiredAccuracy: LocationAccuracy.high,
     );
-
-    await _updateLocation(
-      LatLng(position.latitude, position.longitude),
-    );
+    await _updateLocation(LatLng(position.latitude, position.longitude));
   }
 
   Future<void> _updateLocation(LatLng latLng) async {
     _selectedLatLng = latLng;
+    _mapController?.animateCamera(CameraUpdate.newLatLng(latLng));
 
-    _mapController?.animateCamera(
-      CameraUpdate.newLatLng(latLng),
-    );
-
-    final placemarks = await placemarkFromCoordinates(
-      latLng.latitude,
-      latLng.longitude,
-    );
-
+    final placemarks =
+        await placemarkFromCoordinates(latLng.latitude, latLng.longitude);
     if (placemarks.isNotEmpty) {
       final p = placemarks.first;
       _selectedAddress =
           "${p.name}, ${p.locality}, ${p.administrativeArea}";
     }
 
-    if (!mounted) return;
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
-  // ---------------- SUBMIT ----------------
+  /* ---------------- SUBMIT ---------------- */
 
   Future<void> _submitComplaint() async {
     if (_isSubmitting) return;
@@ -121,40 +109,54 @@ class _AddComplaintPageState extends State<AddComplaintPage> {
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      if (!mounted) return;
-
       AppState.selectedAddress = _selectedAddress;
       AppState.landmark = _landmarkController.text;
       AppState.complaintType = issue;
 
-      Navigator.pop(context);
+      if (mounted) Navigator.pop(context);
     } finally {
-      if (mounted) {
-        setState(() => _isSubmitting = false);
-      }
+      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
-  // ---------------- UI ----------------
+  /* ---------------- UI ---------------- */
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFEFF7F3),
       resizeToAvoidBottomInset: true,
-      appBar: AppBar(title: const Text("Add Complaint")),
+
+      /* ---------- GLASS APP BAR ---------- */
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        title: const Text("Add Complaint"),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF1E6F5C), Color(0xFF2F9E44)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+      ),
+
       body: SingleChildScrollView(
         padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 24,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _buildSearchBar(),
-            _buildMap(),
-            _buildAddressBox(),
-            _buildIssueDropdown(),
-            if (_selectedComplaint == "Other") _buildOtherIssueField(),
-            _buildLandmarkField(),
+            _glassSection(_buildSearchBar()),
+            _glassMap(),
+            _glassSection(_buildAddressBox()),
+            _glassSection(_buildIssueDropdown()),
+            if (_selectedComplaint == "Other")
+              _glassSection(_buildOtherIssueField()),
+            _glassSection(_buildLandmarkField()),
             _buildSubmitButton(),
           ],
         ),
@@ -162,148 +164,187 @@ class _AddComplaintPageState extends State<AddComplaintPage> {
     );
   }
 
-  // ---------------- WIDGETS ----------------
+  /* ---------------- GLASS HELPERS ---------------- */
 
-  Widget _buildSearchBar() {
+  Widget _glassSection(Widget child) {
     return Padding(
       padding: const EdgeInsets.all(12),
-      child: GooglePlaceAutoCompleteTextField(
-        textEditingController: _searchController,
-        focusNode: _searchFocusNode,
-        googleAPIKey: googleApiKey,
-        debounceTime: 800,
-        countries: const ["in"],
-        isLatLngRequired: true,
-        inputDecoration: InputDecoration(
-          hintText: "Search location",
-          prefixIcon: const Icon(Icons.search),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.white.withOpacity(0.65),
+                  Colors.white.withOpacity(0.35),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.green.withOpacity(0.15),
+                  blurRadius: 25,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: child,
           ),
         ),
-        getPlaceDetailWithLatLng: (prediction) {
-          final lat = double.parse(prediction.lat!);
-          final lng = double.parse(prediction.lng!);
-          _updateLocation(LatLng(lat, lng));
-          FocusScope.of(context).unfocus();
-        },
-        itemClick: (_) {
-          FocusScope.of(context).unfocus();
-        },
       ),
     );
   }
 
-  Widget _buildMap() {
-    return SizedBox(
-      height: 300,
-      child: _selectedLatLng == null
-          ? const Center(child: CircularProgressIndicator())
-          : GoogleMap(
-              initialCameraPosition: CameraPosition(
-                target: _selectedLatLng!,
-                zoom: 16,
-              ),
-              onMapCreated: (controller) => _mapController = controller,
-              myLocationEnabled: true,
-              onTap: (pos) {
-                FocusScope.of(context).unfocus();
-                _updateLocation(pos);
-              },
-              markers: {
-                Marker(
-                  markerId: const MarkerId("selected"),
-                  position: _selectedLatLng!,
+  /* ---------------- WIDGETS ---------------- */
+
+  Widget _buildSearchBar() {
+    return GooglePlaceAutoCompleteTextField(
+      textEditingController: _searchController,
+      focusNode: _searchFocusNode,
+      googleAPIKey: googleApiKey,
+      debounceTime: 800,
+      countries: const ["in"],
+      isLatLngRequired: true,
+      inputDecoration: const InputDecoration(
+        hintText: "Search location",
+        prefixIcon: Icon(Icons.search),
+        border: InputBorder.none,
+      ),
+      getPlaceDetailWithLatLng: (prediction) {
+        _updateLocation(
+          LatLng(
+            double.parse(prediction.lat!),
+            double.parse(prediction.lng!),
+          ),
+        );
+        FocusScope.of(context).unfocus();
+      },
+      itemClick: (_) => FocusScope.of(context).unfocus(),
+    );
+  }
+
+  Widget _glassMap() {
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: SizedBox(
+          height: 280,
+          child: _selectedLatLng == null
+              ? const Center(child: CircularProgressIndicator())
+              : GoogleMap(
+                  initialCameraPosition: CameraPosition(
+                    target: _selectedLatLng!,
+                    zoom: 16,
+                  ),
+                  onMapCreated: (c) => _mapController = c,
+                  myLocationEnabled: true,
+                  onTap: _updateLocation,
+                  markers: {
+                    Marker(
+                      markerId: const MarkerId("selected"),
+                      position: _selectedLatLng!,
+                    ),
+                  },
                 ),
-              },
-            ),
+        ),
+      ),
     );
   }
 
   Widget _buildAddressBox() {
-    return Padding(
-      padding: const EdgeInsets.all(12),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Text(
-          _selectedAddress,
-          style: const TextStyle(fontSize: 14),
-        ),
-      ),
+    return Text(
+      _selectedAddress,
+      style: const TextStyle(fontSize: 14),
     );
   }
 
   Widget _buildIssueDropdown() {
-    return Padding(
-      padding: const EdgeInsets.all(12),
-      child: DropdownButtonFormField<String>(
-        initialValue: _selectedComplaint,
-        decoration: InputDecoration(
-          labelText: "Issue Type",
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-        items: _complaintOptions
-            .map(
-              (item) => DropdownMenuItem(
-                value: item,
-                child: Text(item),
-              ),
-            )
-            .toList(),
-        onChanged: (value) {
-          if (value == null) return;
-          setState(() => _selectedComplaint = value);
-        },
+    return DropdownButtonFormField<String>(
+      value: _selectedComplaint,
+      decoration: const InputDecoration(
+        labelText: "Issue Type",
+        border: InputBorder.none,
       ),
+      items: _complaintOptions
+          .map(
+            (item) => DropdownMenuItem(
+              value: item,
+              child: Text(item),
+            ),
+          )
+          .toList(),
+      onChanged: (v) => setState(() => _selectedComplaint = v!),
     );
   }
 
   Widget _buildOtherIssueField() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: TextField(
-        controller: _otherIssueController,
-        decoration: InputDecoration(
-          labelText: "Describe the issue",
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
+    return TextField(
+      controller: _otherIssueController,
+      decoration: const InputDecoration(
+        labelText: "Describe the issue",
+        border: InputBorder.none,
       ),
     );
   }
 
   Widget _buildLandmarkField() {
-    return Padding(
-      padding: const EdgeInsets.all(12),
-      child: TextField(
-        controller: _landmarkController,
-        decoration: InputDecoration(
-          labelText: "Nearby landmark (optional)",
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
+    return TextField(
+      controller: _landmarkController,
+      decoration: const InputDecoration(
+        labelText: "Nearby landmark (optional)",
+        border: InputBorder.none,
       ),
     );
   }
 
   Widget _buildSubmitButton() {
     return Padding(
-      padding: const EdgeInsets.all(16),
-      child: SizedBox(
-        height: 50,
-        child: ElevatedButton(
-          onPressed: _isSubmitting ? null : _submitComplaint,
-          child: _isSubmitting
-              ? const CircularProgressIndicator(color: Colors.white)
-              : const Text("Submit Complaint"),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0.95, end: 1),
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeOutBack,
+        builder: (context, value, child) {
+          return Transform.scale(scale: value, child: child);
+        },
+        child: Container(
+          height: 54,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF2F9E44), Color(0xFF40C057)],
+            ),
+            borderRadius: BorderRadius.circular(30),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.green.withOpacity(0.4),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: ElevatedButton(
+            onPressed: _isSubmitting ? null : _submitComplaint,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              shadowColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
+            ),
+            child: _isSubmitting
+                ? const CircularProgressIndicator(color: Colors.white)
+                : const Text(
+                    "Submit Complaint",
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+          ),
         ),
       ),
     );
