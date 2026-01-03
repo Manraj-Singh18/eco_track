@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
-import { collection, query, where, getDocs, updateDoc, doc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, query, where, getDocs, updateDoc, doc, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { GOOGLE_MAPS_KEY } from '../googleMaps';
 
@@ -9,7 +9,75 @@ import bookmark from '../assets/boomark.svg';
 import write from '../assets/write.svg';
 
 function Maincontent() {
+  let recurringRunning = false;
+  async function runRecurringEngine(){
 
+    if(recurringRunning){
+      console.log("Recurring Engine already running - blocked duplicate");
+      return;
+    }
+    recurringRunning = true;
+
+    try {
+      console.log("Recurring Engine Running...");
+
+      const snap = await getDocs(
+        query(collection(db,"recurringTasks"), where("active","==",true))
+      );
+
+      const now = Date.now();
+
+      for(const d of snap.docs){
+
+        const data = d.data();
+        let next = data.nextExecution;
+
+        if(next?.toMillis) next = next.toMillis();
+
+        if(now >= next){
+
+          const cSnap = await getDocs(
+            collection(db,"complaints")
+          );
+          const allComplaints = cSnap.docs.map(d=>({id:d.id,...d.data()}));
+          const nearby = allComplaints.filter(c=>
+            distance(
+              {latitude: data.location.lat, longitude:data.location.lng},
+              {latitude:c.latitude, longitude:c.longitude}
+            ) <= 60 && c.status==="pending"
+          );
+          const taskRef = await addDoc(collection(db,"tasks"),{
+            issueType: data.issue,
+            complaints: nearby.map(c=>c.id),
+            centerLat: data.location.lat,
+            centerLng: data.location.lng,
+            priorityScore: 100,
+            assignedWorkerId: data.assignedWorkerId || null,
+            status:"ongoing",
+            createdAt: new Date()
+          });
+          for(const c of nearby){
+            await updateDoc(doc(db,"complaints",c.id),{
+              status:"ongoing"
+            });
+          }
+        }
+      }
+
+    } catch(e){
+      console.error("Recurring Engine Error", e);
+    } finally {
+      recurringRunning = false;
+    }
+  }
+
+  async function fetchRecurring(){
+    const snap = await getDocs(collection(db,"recurringTasks"));
+    setRecurringTasks(snap.docs.map(d=>({id:d.id,...d.data()})));
+  }
+
+
+  const [recurringTasks,setRecurringTasks] = useState([]);
   const [complaints, setComplaints] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [workers,setWorkers] = useState([]);
@@ -39,6 +107,8 @@ function Maincontent() {
     fetchComplaints();
     fetchTasks();
     fetchWorkers();
+    runRecurringEngine();
+    fetchRecurring();
   }, []);
 
   async function fetchComplaints(){
@@ -137,23 +207,69 @@ function Maincontent() {
               {!isLoaded ? (
                 <p className='text-center pt-10'>Loading Map...</p>
               ) : (
-                <GoogleMap zoom={14} center={center} mapContainerStyle={{ width:"100%",height:"100%" }}>
-                  {complaints.map(c=>(
-                    <Marker key={c.id}
-                      position={{lat:c.latitude,lng:c.longitude}}
+                <GoogleMap
+                  zoom={14}
+                  center={center}
+                  mapContainerStyle={{ width: "100%", height: "100%" }}
+                >
+                  {/* Complaint markers */}
+                  {complaints.map(c => (
+                    <Marker
+                      key={c.id}
+                      position={{ lat: c.latitude, lng: c.longitude }}
                       icon={{
-                        url: c.status === "pending"
-                          ? "http://maps.google.com/mapfiles/ms/icons/red-dot.png"
-                          : c.status === "ongoing"
-                          ? "http://maps.google.com/mapfiles/ms/icons/yellow-dot.png"
-                          : "http://maps.google.com/mapfiles/ms/icons/green-dot.png"
+                        url:
+                          c.status === "pending"
+                            ? "http://maps.google.com/mapfiles/ms/icons/red-dot.png"
+                            : c.status === "ongoing"
+                            ? "http://maps.google.com/mapfiles/ms/icons/yellow-dot.png"
+                            : "http://maps.google.com/mapfiles/ms/icons/green-dot.png"
                       }}
+                    />
+                  ))}
+
+                  {/* Recurring tasks markers */}
+                  {recurringTasks.map(r => (
+                    <Marker
+                      key={r.id}
+                      position={{ lat: r.location.lat, lng: r.location.lng }}
+                      icon={{
+                        url: "http://maps.google.com/mapfiles/ms/icons/blue-dot.png"
+                      }}
+                      title={`${r.title} — every ${r.frequencyDays} days`}
                     />
                   ))}
                 </GoogleMap>
               )}
             </div>
+
+            {/* 🔥 LEGEND (this is what you were missing visually) */}
+            <div className="flex flex-wrap gap-6 mt-5 text-sm text-gray-600">
+
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                Pending Complaints
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
+                Ongoing Complaints
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                Completed Complaints
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                Recurring Task Area
+              </div>
+
+            </div>
+
           </div>
+
         </div>
 
         {/* -------- ASSIGNED TASKS -------- */}
@@ -263,3 +379,16 @@ function Maincontent() {
 }
 
 export default Maincontent;
+
+function distance(a,b){
+  const R = 6371000;
+  const dLat = (b.latitude - a.latitude) * Math.PI/180;
+  const dLng = (b.longitude - a.longitude) * Math.PI/180;
+  const lat1 = a.latitude * Math.PI/180;
+  const lat2 = b.latitude * Math.PI/180;
+
+  const h = Math.sin(dLat/2)**2 +
+    Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLng/2)**2;
+
+  return R * 2 * Math.atan2(Math.sqrt(h),Math.sqrt(1-h));
+}

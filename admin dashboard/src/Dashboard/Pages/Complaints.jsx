@@ -8,34 +8,46 @@ export default function Complaints() {
   const [loading,setLoading] = useState(true);
   const [sortType,setSortType] = useState("newest");
 
-  // Modal
   const [showModal,setShowModal] = useState(false);
 
   useEffect(() => {
     fetchComplaints();
   }, []);
 
+  /** ---------------- Fetch ---------------- **/
   async function fetchComplaints(){
-    const snap = await getDocs(collection(db,"complaints"));
-    const data = snap.docs.map(d => ({ id:d.id, ...d.data() }));
-    setComplaints(sortComplaints(data, sortType));
-    setLoading(false);
+    try{
+      const snap = await getDocs(collection(db,"complaints"));
+      const data = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+      setComplaints(sortComplaints(data, sortType));
+    } 
+    catch(e){
+      console.error("Failed to load complaints", e);
+    }
+    finally{
+      setLoading(false);
+    }
+  }
+
+  /** ---------------- Sorting ---------------- **/
+  function safeTime(x){
+    return x?.createdAt?.seconds || 0;
   }
 
   function sortComplaints(data, type){
     const sorted = [...data];
 
     if(type === "newest")
-      sorted.sort((a,b)=>b.createdAt?.seconds - a.createdAt?.seconds);
+      sorted.sort((a,b)=> safeTime(b) - safeTime(a));
 
     if(type === "oldest")
-      sorted.sort((a,b)=>a.createdAt?.seconds - b.createdAt?.seconds);
+      sorted.sort((a,b)=> safeTime(a) - safeTime(b));
 
     if(type === "status")
-      sorted.sort((a,b)=>a.status.localeCompare(b.status));
+      sorted.sort((a,b)=> (a.status || "").localeCompare(b.status || ""));
 
     if(type === "issue")
-      sorted.sort((a,b)=>a.issue.localeCompare(b.issue));
+      sorted.sort((a,b)=> (a.issue || "").localeCompare(b.issue || ""));
 
     return sorted;
   }
@@ -45,26 +57,50 @@ export default function Complaints() {
     setComplaints(prev => sortComplaints(prev, type));
   }
 
+  /** ---------------- Status Update ---------------- **/
   async function updateStatus(id,status){
-    await updateDoc(doc(db,"complaints",id),{ status });
-    fetchComplaints();
+    try{
+      await updateDoc(doc(db,"complaints",id),{ status });
+
+      setComplaints(prev =>
+        prev.map(c => c.id === id ? {...c, status} : c)
+      );
+    }
+    catch(e){
+      console.error("Status update failed", e);
+      alert("Failed to update status");
+    }
   }
 
+  /** ---------------- Delete One ---------------- **/
   async function deleteComplaint(id){
-    await deleteDoc(doc(db,"complaints",id));
-    fetchComplaints();
+    try{
+      await deleteDoc(doc(db,"complaints",id));
+      setComplaints(prev => prev.filter(c=>c.id !== id));
+    }
+    catch(e){
+      console.error("Delete failed", e);
+      alert("Failed to delete complaint");
+    }
   }
 
+  /** ---------------- Delete All Completed ---------------- **/
   async function deleteAllCompleted(){
     setShowModal(false);
 
     const completed = complaints.filter(c=>c.status==="completed");
 
-    await Promise.all(
-      completed.map(c => deleteDoc(doc(db,"complaints",c.id)))
-    );
+    try{
+      await Promise.all(
+        completed.map(c => deleteDoc(doc(db,"complaints",c.id)))
+      );
 
-    fetchComplaints();
+      setComplaints(prev => prev.filter(c=>c.status !== "completed"));
+    }
+    catch(e){
+      console.error("Bulk delete failed", e);
+      alert("Failed to delete some complaints");
+    }
   }
 
   const completedCount = complaints.filter(c=>c.status==="completed").length;
@@ -79,44 +115,24 @@ export default function Complaints() {
       <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
 
         <div className="flex gap-3">
-          <button
-            className={`px-5 py-2 rounded-full text-sm border transition-all ${
-              sortType==="newest" ? "bg-[#3f634d] text-white" : "bg-white"
-            }`}
-            onClick={()=>handleSort("newest")}
-          >
-            Newest
-          </button>
-
-          <button
-            className={`px-5 py-2 rounded-full text-sm border transition-all ${
-              sortType==="oldest" ? "bg-[#3f634d] text-white" : "bg-white"
-            }`}
-            onClick={()=>handleSort("oldest")}
-          >
-            Oldest
-          </button>
-
-          <button
-            className={`px-5 py-2 rounded-full text-sm border transition-all ${
-              sortType==="status" ? "bg-[#3f634d] text-white" : "bg-white"
-            }`}
-            onClick={()=>handleSort("status")}
-          >
-            Status
-          </button>
-
-          <button
-            className={`px-5 py-2 rounded-full text-sm border transition-all ${
-              sortType==="issue" ? "bg-[#3f634d] text-white" : "bg-white"
-            }`}
-            onClick={()=>handleSort("issue")}
-          >
-            Issue Type
-          </button>
+          {[
+            {key:"newest", label:"Newest"},
+            {key:"oldest", label:"Oldest"},
+            {key:"status", label:"Status"},
+            {key:"issue", label:"Issue Type"}
+          ].map(btn=>(
+            <button
+              key={btn.key}
+              className={`px-5 py-2 rounded-full text-sm border transition-all ${
+                sortType===btn.key ? "bg-[#3f634d] text-white" : "bg-white"
+              }`}
+              onClick={()=>handleSort(btn.key)}
+            >
+              {btn.label}
+            </button>
+          ))}
         </div>
 
-        {/* DELETE ALL COMPLETED BUTTON */}
         {completedCount > 0 && (
           <button
             onClick={()=>setShowModal(true)}
@@ -128,7 +144,8 @@ export default function Complaints() {
       </div>
 
       {/* LIST */}
-      <div className="bg-white rounded-2xl shadow-sm p-6">
+      <div className="bg-white rounded-2xl shadow-sm p-6 min-h-[300px]">
+
         {loading && <p>Loading...</p>}
 
         {!complaints.length && !loading && (
@@ -138,16 +155,18 @@ export default function Complaints() {
         <div className="space-y-5">
           {complaints.map(c=>(
             <div key={c.id}
-            className="border rounded-xl p-4 flex justify-between items-start">
+              className="border rounded-xl p-4 flex justify-between items-start">
 
               <div>
                 <h3 className="text-xl text-[#244034] font-[500] mb-1">
-                  {c.issue}
+                  {c.issue || "Unknown Issue"}
                 </h3>
 
-                <p className="text-gray-600 text-sm">
-                  📍 {c.address}
-                </p>
+                {c.address && (
+                  <p className="text-gray-600 text-sm">
+                    📍 {c.address}
+                  </p>
+                )}
 
                 {c.landmark && (
                   <p className="text-gray-500 text-sm">
@@ -156,9 +175,9 @@ export default function Complaints() {
                 )}
 
                 <p className="text-gray-400 text-sm mt-1">
-                  {c.createdAt?.seconds &&
-                    new Date(c.createdAt.seconds * 1000).toLocaleString()
-                  }
+                  {c.createdAt?.seconds
+                    ? new Date(c.createdAt.seconds * 1000).toLocaleString()
+                    : "No timestamp"}
                 </p>
 
                 <span className={`
@@ -167,11 +186,10 @@ export default function Complaints() {
                   ${c.status==="ongoing" && "bg-yellow-100 text-yellow-700"}
                   ${c.status==="completed" && "bg-green-100 text-green-700"}
                 `}>
-                  {c.status.toUpperCase()}
+                  {(c.status || "unknown").toUpperCase()}
                 </span>
               </div>
 
-              {/* STATUS CONTROLS */}
               <div className="flex flex-col gap-2">
 
                 {c.status !== "pending" && (
@@ -201,7 +219,6 @@ export default function Complaints() {
                   </button>
                 )}
 
-                {/* DELETE ONLY IF COMPLETED */}
                 {c.status === "completed" && (
                   <button
                     onClick={()=>deleteComplaint(c.id)}
