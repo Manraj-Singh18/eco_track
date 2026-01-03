@@ -1,33 +1,81 @@
- import { Routes, Route } from 'react-router-dom';
- import Dashboard from './Dashboard/Dashboard';
- import Maincontent from './Dashboard/Maincontent';
+import { Routes, Route } from "react-router-dom";
+import { Suspense, lazy } from "react";
 
- import AccountSettings from './Dashboard/Pages/AccountSettings';
- import Complaints from './Dashboard/Pages/Complaints';
- import MyProfile from './Dashboard/Pages/MyProfile';
- import Tasks from './Dashboard/Pages/Tasks';
+// Lazy Loaded Pages
+const Dashboard = lazy(() => import("./Dashboard/Dashboard"));
+const Maincontent = lazy(() => import("./Dashboard/Maincontent"));
+const AccountSettings = lazy(() => import("./Dashboard/Pages/AccountSettings"));
+const Complaints = lazy(() => import("./Dashboard/Pages/Complaints"));
+const MyProfile = lazy(() => import("./Dashboard/Pages/MyProfile"));
+const Tasks = lazy(() => import("./Dashboard/Pages/Tasks"));
+const RecurringSuggestions = lazy(() => import("./Dashboard/Pages/RecurringSuggestions"));
+const RecurringTasks = lazy(() => import("./Dashboard/Pages/RecurringTasks"));
 
- import Login from './Login';
- import ProtectedRoute from './ProtectedRoute';
+const Login = lazy(() => import("./Login"));
+import ProtectedRoute from "./ProtectedRoute";
 
- function App() {
-   return (
-     <Routes>
+function App() {
+  return (
+    <Suspense
+      fallback={
+        <div
+          style={{
+            width: "100%",
+            height: "100vh",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            fontSize: "24px",
+            color: "#244034",
+          }}
+        >
+          Loading Dashboard...
+        </div>
+      }
+    >
+      <Routes>
 
-       <Route path="/login" element={<Login />} />
+        {/* Public Route */}
+        <Route path="/login" element={<Login />} />
 
-       <Route element={<ProtectedRoute />}>
-         <Route path="/" element={<Dashboard />}>
-           <Route index element={<Maincontent />} />
-           <Route path='Pages/AccountSettings' element={<AccountSettings />} />
-           <Route path='Pages/Complaints' element={<Complaints />} />
-           <Route path='Pages/MyProfile' element={<MyProfile />} />
-           <Route path='Pages/Tasks' element={<Tasks />} />
-         </Route>
-       </Route>
+        {/* Protected Routes */}
+        <Route element={<ProtectedRoute />}>
+          <Route path="/" element={<Dashboard />}>
+            <Route index element={<Maincontent />} />
+            <Route path="Pages/AccountSettings" element={<AccountSettings />} />
+            <Route path="Pages/Complaints" element={<Complaints />} />
+            <Route path="Pages/MyProfile" element={<MyProfile />} />
+            <Route path="Pages/Tasks" element={<Tasks />} />
+            <Route
+              path="Pages/RecurringSuggestions"
+              element={<RecurringSuggestions />}
+            />
+            <Route path="Pages/RecurringTasks" element={<RecurringTasks />} />
+          </Route>
+        </Route>
 
-     </Routes>
-   );
+        {/* 404 */}
+        <Route
+          path="*"
+          element={
+            <div
+              style={{
+                width: "100%",
+                height: "100vh",
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                fontSize: "24px",
+                color: "#244034",
+              }}
+            >
+              404 — Page Not Found
+            </div>
+          }
+        />
+      </Routes>
+    </Suspense>
+  );
 }
 
 export default App;
