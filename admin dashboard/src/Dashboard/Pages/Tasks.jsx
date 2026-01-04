@@ -130,7 +130,7 @@ export default function Tasks() {
 
     setLoading(false);
   }
-  
+
   /** ---------------- Distance Helper ---------------- **/
   function distance(a, b) {
     const R = 6371000;
@@ -163,8 +163,8 @@ export default function Tasks() {
 
     const ISSUE_WEIGHTS = {
       "spillage": 4,
-      "washroom": 3,
-      "dustbin overfilled": 1
+      "dirty washroom": 3,
+      "dustbin overflow": 1
     };
 
     const issueGroups = {};
