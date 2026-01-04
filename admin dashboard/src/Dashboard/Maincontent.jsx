@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
-import { collection, addDoc, query, where, getDocs, updateDoc, doc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, query, where, getDoc, getDocs, updateDoc, doc, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { GOOGLE_MAPS_KEY } from '../googleMaps';
 
@@ -120,7 +120,33 @@ function Maincontent() {
   async function fetchTasks(){
     const q = query(collection(db,"tasks"), where("status","==","ongoing"));
     const snap = await getDocs(q);
-    setTasks(snap.docs.map(d=>({ id:d.id, ...d.data() })));
+
+    const cleaned = [];
+
+    for(const d of snap.docs){
+      const t = { id:d.id, ...d.data() };
+
+      const existingComplaints = [];
+      for(const cid of t.complaints){
+        const c = await getDocs(query(collection(db,"complaints"), where("__name__","==",cid)));
+        if(!c.empty) existingComplaints.push(cid);
+      }
+
+      if(existingComplaints.length === 0){
+        await deleteDoc(doc(db,"tasks",t.id));
+        continue;
+      }
+
+      if(existingComplaints.length !== t.complaints.length){
+        await updateDoc(doc(db,"tasks",t.id), {
+          complaints: existingComplaints
+        });
+      }
+
+      cleaned.push({ ...t, complaints: existingComplaints });
+    }
+
+    setTasks(cleaned);
   }
 
   async function fetchWorkers(){
@@ -133,15 +159,39 @@ function Maincontent() {
     : { lat: 28.6139, lng: 77.2090 };
 
   async function markComplete(task){
-    for(const cid of task.complaints){
-      await updateDoc(doc(db,"complaints",cid),{status:"completed"});
+    try {
+      const validComplaints = [];
+
+      for(const cid of task.complaints){
+        const ref = doc(db,"complaints",cid);
+        const snap = await getDocs(query(collection(db,"complaints"), where("__name__", "==", cid)));
+
+        if (!snap.empty) {
+          const data = snap.docs[0].data();
+
+          if(data.status !== "completed"){
+            await updateDoc(ref, { status:"completed" });
+          }
+
+          validComplaints.push(cid);
+        }
+      }
+
+      if(validComplaints.length === 0){
+        await deleteDoc(doc(db,"tasks",task.id));
+        return fetchTasks();
+      }
+
+      await deleteDoc(doc(db,"tasks",task.id));
+
+      fetchTasks();
+      fetchComplaints();
+
+    } catch(e){
+      console.error("Safe complete failed", e);
     }
-
-    await deleteDoc(doc(db,"tasks",task.id));
-
-    fetchTasks();
-    fetchComplaints();
   }
+
 
   async function reassignWorker(task,newWorkerId){
     await updateDoc(doc(db,"tasks",task.id),{
@@ -156,8 +206,15 @@ function Maincontent() {
 
     await deleteDoc(doc(db,"tasks",task.id));
 
-    for(const cid of task.complaints){
-      await updateDoc(doc(db,"complaints",cid),{status:"pending"});
+    for (const cid of task.complaints) {
+      const ref = doc(db, "complaints", cid);
+      const snap = await getDoc(ref);
+
+      if (snap.exists()) {
+        await updateDoc(ref, { status: "pending" });
+      } else {
+        console.warn("Skipping missing complaint:", cid);
+      }
     }
 
     fetchTasks();
@@ -355,11 +412,15 @@ function Maincontent() {
             </p>
 
             <ul className="mt-3 max-h-[250px] overflow-y-auto space-y-2">
-              {selectedTask.complaints.map((id)=>(
-                <li key={id} className="bg-gray-100 p-2 rounded">
-                  Complaint ID: {id}
-                </li>
-              ))}
+              <ul>
+                {selectedTask.complaints?.length
+                ? selectedTask.complaints.map(id => (
+                    <li key={id}>
+                      Complaint ID: {id}
+                    </li>
+                  ))
+                : <li>No linked complaints remain</li>}
+              </ul>
             </ul>
 
             <div className="flex justify-end mt-6">
