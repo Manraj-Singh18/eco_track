@@ -66,7 +66,7 @@ function Dashboard() {
     if (location.pathname === "/") {
       setActiveItem("Dashboard");
     } else {
-      const match = navItems.find(n => location.pathname.includes(n.path.replace("/Pages/", "")));
+      const match = navItems.find(n => location.pathname.startsWith(n.path.replace("/Pages/", "")));
       if (match) setActiveItem(match.name);
     }
   }, [location.pathname]);

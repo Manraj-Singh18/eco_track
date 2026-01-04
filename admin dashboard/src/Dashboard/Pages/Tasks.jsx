@@ -131,7 +131,6 @@ export default function Tasks() {
     setLoading(false);
   }
 
-
   /** ---------------- Distance Helper ---------------- **/
   function distance(a, b) {
     const R = 6371000;
@@ -149,7 +148,6 @@ export default function Tasks() {
     return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
   }
 
-
   /** ---------------- Priority System ---------------- **/
   function urgencyScore(hours) {
     if (hours > 48) return 5;
@@ -160,13 +158,18 @@ export default function Tasks() {
 
 
   /** ---------------- Grouping Algorithm ---------------- **/
-  function buildTasks(list) {
-    if (!list.length) return [];
+  function buildTasks(list){
+    if(!list.length) return [];
+
+    const ISSUE_WEIGHTS = {
+      "spillage": 4,
+      "dirty washroom": 3,
+      "dustbin overflow": 1
+    };
 
     const issueGroups = {};
-
-    list.forEach(c => {
-      if (!issueGroups[c.issue]) issueGroups[c.issue] = [];
+    list.forEach(c=>{
+      if(!issueGroups[c.issue]) issueGroups[c.issue] = [];
       issueGroups[c.issue].push(c);
     });
 
@@ -176,30 +179,38 @@ export default function Tasks() {
       const issueList = issueGroups[issue];
       const visited = new Set();
 
-      for (let i = 0; i < issueList.length; i++) {
-        if (visited.has(i)) continue;
+      for(let i=0;i<issueList.length;i++){
+        if(visited.has(i)) continue;
 
-        const cluster = [issueList[i]];
+        const cluster=[issueList[i]];
         visited.add(i);
 
-        for (let j = i + 1; j < issueList.length; j++) {
-          if (visited.has(j)) continue;
+        for(let j=i+1;j<issueList.length;j++){
+          if(visited.has(j)) continue;
 
           const d = distance(issueList[i], issueList[j]);
-          if (d <= 50) {
+          if(d <= 50){
             visited.add(j);
             cluster.push(issueList[j]);
           }
         }
 
-        const lat = cluster.reduce((a, c) => a + c.latitude, 0) / cluster.length;
-        const lng = cluster.reduce((a, c) => a + c.longitude, 0) / cluster.length;
+        const lat = cluster.reduce((a,c)=>a+c.latitude,0)/cluster.length;
+        const lng = cluster.reduce((a,c)=>a+c.longitude,0)/cluster.length;
 
-        let score = cluster.length * 3;
+        // ----- PRIORITY SCORE -----
+        let score = 0;
 
-        cluster.forEach(c => {
-          const hours =
-            (Date.now() - c.createdAt.seconds * 1000) / 3600000;
+        // Issue Type Weight
+        const w = ISSUE_WEIGHTS[issue?.toLowerCase().trim()] || 2;
+        score += w * 10;             // base weight impact
+
+        // Group Size Impact
+        score += cluster.length * 3;
+
+        // Urgency Impact
+        cluster.forEach(c=>{
+          const hours = (Date.now() - c.createdAt.seconds*1000)/3600000;
           score += urgencyScore(hours);
         });
 
@@ -210,10 +221,11 @@ export default function Tasks() {
           centerLng: lng,
           priorityScore: score
         });
+
       }
     });
 
-    tasks.sort((a, b) => b.priorityScore - a.priorityScore);
+    tasks.sort((a,b)=>b.priorityScore - a.priorityScore);
     return tasks;
   }
 
