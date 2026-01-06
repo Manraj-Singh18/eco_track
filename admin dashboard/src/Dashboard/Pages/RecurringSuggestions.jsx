@@ -4,7 +4,6 @@ import { db } from "../../firebase";
 
 export default function RecurringSuggestions() {
 
-  const [complaints,setComplaints] = useState([]);
   const [suggestions,setSuggestions] = useState([]);
   const [workers,setWorkers] = useState([]);
   const [loading,setLoading] = useState(true);
@@ -15,81 +14,31 @@ export default function RecurringSuggestions() {
 
   async function loadData(){
 
-    const cSnap = await getDocs(collection(db,"complaints"));
-    const all = cSnap.docs.map(d=>({id:d.id,...d.data()}));
-    setComplaints(all);
+    // Load recurring suggestions detected by engine
+    const sSnap = await getDocs(collection(db,"recurringSuggestions"));
+    setSuggestions(
+      sSnap.docs.map(d=>({ id:d.id, ...d.data() }))
+    );
 
+    // Load workers
     const wSnap = await getDocs(collection(db,"workers"));
-    setWorkers(wSnap.docs.map(d=>({ firestoreId:d.id, ...d.data() })));
-
-    setSuggestions(buildRecurringSuggestions(all));
+    setWorkers(
+      wSnap.docs.map(d=>({ firestoreId:d.id, ...d.data() }))
+    );
 
     setLoading(false);
-  }
-
-  function distance(a,b){
-    const R = 6371000;
-    const dLat = (b.latitude - a.latitude) * Math.PI/180;
-    const dLng = (b.longitude - a.longitude) * Math.PI/180;
-    const lat1 = a.latitude * Math.PI/180;
-    const lat2 = b.latitude * Math.PI/180;
-
-    const h = Math.sin(dLat/2)**2 +
-      Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLng/2)**2;
-
-    return R * 2 * Math.atan2(Math.sqrt(h),Math.sqrt(1-h));
-  }
-
-  function buildRecurringSuggestions(list){
-    if(!list.length) return [];
-
-    const groups = {};
-
-    list.forEach(c=>{
-      if(!groups[c.issue]) groups[c.issue] = [];
-      groups[c.issue].push(c);
-    });
-
-    let result = [];
-
-    Object.keys(groups).forEach(issue=>{
-      const arr = groups[issue];
-
-      for(let i=0;i<arr.length;i++){
-        let cluster=[arr[i]];
-
-        for(let j=i+1;j<arr.length;j++){
-          if(distance(arr[i],arr[j])<=50){
-            cluster.push(arr[j]);
-          }
-        }
-
-        if(cluster.length >= 4){ 
-          // recurring-worthy threshold
-          result.push({
-            issue,
-            count: cluster.length,
-            location:{
-              lat: cluster.reduce((s,c)=>s+c.latitude,0)/cluster.length,
-              lng: cluster.reduce((s,c)=>s+c.longitude,0)/cluster.length
-            }
-          });
-        }
-      }
-    });
-
-    return result;
   }
 
   async function convertToRecurring(item, frequencyDays, workerId){
 
     await addDoc(collection(db,"recurringTasks"),{
-      title: item.issue,
+      title: item.title || item.issue,
       issue: item.issue,
-      location:item.location,
+      location: item.location,
       frequencyDays,
       assignedWorkerId: workerId || null,
-      nextExecution: Date.now() + (frequencyDays*24*60*60*1000),
+      nextExecution: new Date(Date.now() + (frequencyDays*24*60*60*1000)),
+      lastRun: null,
       active:true,
       createdAt:new Date()
     });
@@ -113,14 +62,19 @@ export default function RecurringSuggestions() {
 
       <div className="space-y-5">
         {suggestions.map((s,i)=>(
-          <div key={i} className="bg-white border rounded-xl p-5 shadow-sm">
+
+          <div key={s.id} className="bg-white border rounded-xl p-5 shadow-sm">
 
             <h3 className="text-xl text-[#244034] font-[500]">
               {s.issue}
             </h3>
 
             <p className="text-gray-600">
-              Reported {s.count} times at same area
+              Suggested recurring hotspot detected
+            </p>
+
+            <p className="text-gray-500 text-sm">
+              📍 Lat: {s.location?.lat?.toFixed(5)} — Lng: {s.location?.lng?.toFixed(5)}
             </p>
 
             <div className="flex gap-3 mt-3">
@@ -150,9 +104,11 @@ export default function RecurringSuggestions() {
               >
                 Convert To Recurring
               </button>
+
             </div>
 
           </div>
+
         ))}
       </div>
     </div>
