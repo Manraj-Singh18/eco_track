@@ -10,6 +10,7 @@ class ComplaintListPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    precacheImage(const AssetImage('assets/image.png'), context);
     final user = FirebaseAuth.instance.currentUser!;
 
     return Scaffold(
@@ -22,7 +23,6 @@ class ComplaintListPage extends StatelessWidget {
             expandedHeight: 140,
             backgroundColor: Colors.transparent,
             elevation: 0,
-            leadingWidth: 0,
             flexibleSpace: LayoutBuilder(
               builder: (context, constraints) {
                 final collapsed =
@@ -35,41 +35,29 @@ class ComplaintListPage extends StatelessWidget {
                       sigmaY: collapsed ? 12 : 0,
                     ),
                     child: Container(
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
                           colors: [
                             Color(0xFF1E6F5C),
                             Color(0xFF2F9E44),
                           ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
                         ),
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.only(
-                          left: 16,
-                          right: 16,
-                          bottom: 16,
-                        ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.end,
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      child: Align(
+                        alignment: Alignment.bottomCenter,
+                        child: Row(
                           children: [
-                            Row(
-                              children: [
-                                _AnimatedLogo(),
-                                const SizedBox(width: 12),
-                                _GradientTitle(),
-                                const Spacer(),
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.logout_rounded,
-                                    color: Colors.white,
-                                  ),
-                                  onPressed: () async {
-                                    await FirebaseAuth.instance.signOut();
-                                  },
-                                ),
-                              ],
+                            const _AnimatedLogo(),
+                            const SizedBox(width: 12),
+                            const _GradientTitle(),
+                            const Spacer(),
+                            IconButton(
+                              icon: const Icon(Icons.logout_rounded,
+                                  color: Colors.white),
+                              onPressed: () async {
+                                await FirebaseAuth.instance.signOut();
+                              },
                             ),
                           ],
                         ),
@@ -82,48 +70,45 @@ class ComplaintListPage extends StatelessWidget {
           ),
 
           /* ---------------- BODY ---------------- */
-          SliverToBoxAdapter(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('complaints')
-                  .where('userId', isEqualTo: user.uid)
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState ==
-                    ConnectionState.waiting) {
-                  return const Padding(
-                    padding: EdgeInsets.only(top: 60),
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('complaints')
+                .where('userId', isEqualTo: user.uid)
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.only(top: 80),
                     child: Center(child: CircularProgressIndicator()),
-                  );
-                }
+                  ),
+                );
+              }
 
-                if (!snapshot.hasData ||
-                    snapshot.data!.docs.isEmpty) {
-                  return const _EmptyState();
-                }
+              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                return const SliverToBoxAdapter(child: _EmptyState());
+              }
 
-                final complaints = snapshot.data!.docs;
+              final complaints = snapshot.data!.docs;
 
-                return ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  padding:
-                      const EdgeInsets.fromLTRB(16, 16, 16, 90),
-                  itemCount: complaints.length,
-                  itemBuilder: (context, index) {
-                    final data = complaints[index].data()
-                        as Map<String, dynamic>;
+              return SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final data =
+                        complaints[index].data() as Map<String, dynamic>;
 
                     return AnimatedComplaintCard(
                       index: index,
                       issue: data['issue'] ?? 'Unknown',
                       address: data['address'] ?? 'No address',
+                      landmark: data['landmark'] ?? '',
                       status: data['status'] ?? 'pending',
                     );
                   },
-                );
-              },
-            ),
+                  childCount: complaints.length,
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -132,10 +117,7 @@ class ComplaintListPage extends StatelessWidget {
       floatingActionButton: Container(
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [
-              Color(0xFF2F9E44),
-              Color(0xFF40C057),
-            ],
+            colors: [Color(0xFF2F9E44), Color(0xFF40C057)],
           ),
           borderRadius: BorderRadius.circular(30),
           boxShadow: [
@@ -154,9 +136,7 @@ class ComplaintListPage extends StatelessWidget {
           onPressed: () {
             Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (_) => const AddComplaintPage(),
-              ),
+              MaterialPageRoute(builder: (_) => const AddComplaintPage()),
             );
           },
         ),
@@ -165,74 +145,58 @@ class ComplaintListPage extends StatelessWidget {
   }
 }
 
-/* ---------------- ANIMATED LOGO ---------------- */
+/* ---------------- LOGO ---------------- */
 
 class _AnimatedLogo extends StatelessWidget {
+  const _AnimatedLogo();
+
   @override
   Widget build(BuildContext context) {
     return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0.8, end: 1),
-      duration: const Duration(milliseconds: 700),
-      curve: Curves.easeOutBack,
+      tween: Tween(begin: 0.9, end: 1),
+      duration: const Duration(milliseconds: 600),
+      curve: Curves.easeOutCubic,
       builder: (context, value, child) {
+        final v = value.clamp(0.0, 1.0);
         return Transform.scale(
-          scale: value,
-          child: Opacity(opacity: value, child: child),
+          scale: v,
+          child: Opacity(opacity: v, child: child),
         );
       },
-      child: Image.asset(
-        'assets/image.png',
-        height: 36,
+      child: Image.asset('assets/image.png', height: 36),
+    );
+  }
+}
+
+/* ---------------- TITLE ---------------- */
+
+class _GradientTitle extends StatelessWidget {
+  const _GradientTitle();
+
+  @override
+  Widget build(BuildContext context) {
+    return ShaderMask(
+      shaderCallback: (bounds) => const LinearGradient(
+        colors: [
+          Color(0xFFE8F5E9),
+          Color(0xFFB9F6CA),
+          Color(0xFF69F0AE),
+        ],
+      ).createShader(bounds),
+      child: const Text(
+        "EcoTrack",
+        style: TextStyle(
+          fontSize: 22,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.4,
+          color: Colors.white,
+        ),
       ),
     );
   }
 }
 
-/* ---------------- GRADIENT TITLE ---------------- */
-
-class _GradientTitle extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Text(
-          "EcoTrack",
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 1.4,
-            foreground: Paint()
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = 1.5
-              ..color = Colors.white.withOpacity(0.15),
-          ),
-        ),
-        ShaderMask(
-          shaderCallback: (bounds) {
-            return const LinearGradient(
-              colors: [
-                Color(0xFFE8F5E9),
-                Color(0xFFA5D6A7),
-                Color(0xFF69F0AE),
-              ],
-            ).createShader(bounds);
-          },
-          child: const Text(
-            "EcoTrack",
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.4,
-              color: Colors.white,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/* ---------------- EMPTY STATE ---------------- */
+/* ---------------- EMPTY ---------------- */
 
 class _EmptyState extends StatelessWidget {
   const _EmptyState();
@@ -240,27 +204,26 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(top: 80),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: const [
-            Icon(Icons.eco_rounded, size: 52, color: Colors.green),
-            SizedBox(height: 12),
-            Text("No complaints yet 🌱"),
-          ],
-        ),
+      padding: const EdgeInsets.only(top: 100),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: const [
+          Icon(Icons.eco_rounded, size: 52, color: Colors.green),
+          SizedBox(height: 12),
+          Text("No complaints yet 🌱"),
+        ],
       ),
     );
   }
 }
 
-/* ---------------- GLASS CARD ---------------- */
+/* ---------------- CARD ---------------- */
 
 class AnimatedComplaintCard extends StatelessWidget {
   final int index;
   final String issue;
   final String address;
+  final String landmark;
   final String status;
 
   const AnimatedComplaintCard({
@@ -268,6 +231,7 @@ class AnimatedComplaintCard extends StatelessWidget {
     required this.index,
     required this.issue,
     required this.address,
+    required this.landmark,
     required this.status,
   });
 
@@ -300,114 +264,122 @@ class AnimatedComplaintCard extends StatelessWidget {
       duration: Duration(milliseconds: 400 + index * 80),
       curve: Curves.easeOutCubic,
       builder: (context, value, child) {
+        final v = value.clamp(0.0, 1.0);
         return Opacity(
-          opacity: value,
+          opacity: v,
           child: Transform.translate(
-            offset: Offset(0, 20 * (1 - value)),
+            offset: Offset(0, 20 * (1 - v)),
             child: child,
           ),
         );
       },
       child: GestureDetector(
         onLongPress: () => HapticFeedback.mediumImpact(),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(22),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 18),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.white.withOpacity(0.65),
-                    Colors.white.withOpacity(0.35),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(22),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.green.withOpacity(0.15),
-                    blurRadius: 30,
-                    offset: const Offset(0, 15),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: _statusGradient(),
-                          ),
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: _statusGradient()
-                                  .first
-                                  .withOpacity(0.5),
-                              blurRadius: 16,
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.report_problem_rounded,
-                          color: Colors.white,
-                          size: 18,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          issue,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(22),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.white.withOpacity(0.65),
+                      Colors.white.withOpacity(0.35),
                     ],
                   ),
-                  const SizedBox(height: 10),
-                  Text(address),
-                  const SizedBox(height: 14),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: _statusGradient(),
-                        ),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            _statusIcon(),
-                            size: 16,
-                            color: Colors.white,
+                  borderRadius: BorderRadius.circular(22),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.green.withOpacity(0.15),
+                      blurRadius: 30,
+                      offset: const Offset(0, 15),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            gradient:
+                                LinearGradient(colors: _statusGradient()),
+                            shape: BoxShape.circle,
                           ),
-                          const SizedBox(width: 6),
-                          Text(
-                            status.toUpperCase(),
+                          child: const Icon(
+                            Icons.report_problem_rounded,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            issue,
                             style: const TextStyle(
-                              color: Colors.white,
+                              fontSize: 16,
                               fontWeight: FontWeight.w600,
-                              letterSpacing: 0.6,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Text(address),
+                    if (landmark.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          const Icon(Icons.place_rounded,
+                              size: 16, color: Colors.green),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              landmark,
+                              style: const TextStyle(
+                                fontStyle: FontStyle.italic,
+                              ),
                             ),
                           ),
                         ],
                       ),
+                    ],
+                    const SizedBox(height: 14),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          gradient:
+                              LinearGradient(colors: _statusGradient()),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(_statusIcon(),
+                                size: 16, color: Colors.white),
+                            const SizedBox(width: 6),
+                            Text(
+                              status.toUpperCase(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.6,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
