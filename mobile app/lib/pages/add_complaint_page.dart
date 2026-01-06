@@ -17,7 +17,7 @@ class AddComplaintPage extends StatefulWidget {
 }
 
 class _AddComplaintPageState extends State<AddComplaintPage> {
-  final String googleApiKey = "YOUR_GOOGLE_MAPS_API_KEY";
+  final String googleApiKey = "AIzaSyDlsmrFO14h_f96HnzdBeJRQyH3DJfc27g";
 
   GoogleMapController? _mapController;
   final FocusNode _searchFocusNode = FocusNode();
